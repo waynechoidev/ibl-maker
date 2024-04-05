@@ -38,7 +38,7 @@ void Window::initialise()
 	glfwWindowHint(GLFW_OPENGL_FORWARD_COMPAT, GL_TRUE);
 
 	// Create the window
-	_mainWindow = glfwCreateWindow(_width, _height, "OpenGL Lighting", 0, 0);
+	_mainWindow = glfwCreateWindow(_width, _height, "Generating Textures...", 0, 0);
 
 	if (!_mainWindow)
 	{

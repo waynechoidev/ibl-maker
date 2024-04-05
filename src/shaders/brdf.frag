@@ -109,5 +109,11 @@ vec2 IntegrateBRDF(float NdotV, float roughness)
 void main() 
 {
     vec2 integratedBRDF = IntegrateBRDF(TexCoords.x, TexCoords.y);
+
+    // HDR tonemapping
+    integratedBRDF = integratedBRDF / (integratedBRDF + vec2(1.0));
+    // gamma correct
+    integratedBRDF = pow(integratedBRDF, vec2(1.0/2.2)); 
+
     FragColor = integratedBRDF;
 }

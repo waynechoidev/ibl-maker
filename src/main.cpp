@@ -22,20 +22,9 @@ std::string fileName = "air_museum_playground_4k.hdr";
 std::filesystem::path currentDir = std::filesystem::path(__FILE__).parent_path();
 std::filesystem::path rootDir = std::filesystem::path(__FILE__).parent_path().parent_path();
 
-const GLfloat SPHERE_SCALE = 1.0;
-const GLint WIDTH = 1920;
-const GLint HEIGHT = 1080;
-
 GLint envCubeSize = 2048;
 GLint irradianceSize = 128;
 GLint brdfSize = 512;
-
-bool useDirectLight = true;
-bool useEnvLight = true;
-float heightScale = 0.03;
-glm::vec3 lightPos = glm::vec3(0.0f, 0.0f, 2.0f);
-bool dragStartFlag = false;
-glm::vec3 prevMouseRayVector = glm::vec3(0.0f, 1.0f, 0.0f);
 
 void saveImage(const char *filename, int width, int height, unsigned char *data)
 {
@@ -102,6 +91,12 @@ int main()
 	GLuint equirectangularToCubemapViewLoc = glGetUniformLocation(equirectangularToCubemapProgramId, "view");
 	GLuint equirectangularToCubemapProjectionLoc = glGetUniformLocation(equirectangularToCubemapProgramId, "projection");
 
+	Program envProgram = Program();
+	envProgram.createFromFiles(currentDir / "shaders/cubemap.vert", currentDir / "shaders/env.frag");
+	GLuint envProgramId = envProgram.getId();
+	GLuint envViewLoc = glGetUniformLocation(envProgramId, "view");
+	GLuint envProjectionLoc = glGetUniformLocation(envProgramId, "projection");
+
 	Program irradianceProgram = Program();
 	irradianceProgram.createFromFiles(currentDir / "shaders/cubemap.vert", currentDir / "shaders/irradiance.frag");
 	GLuint irradianceProgramId = irradianceProgram.getId();
@@ -130,9 +125,9 @@ int main()
 	std::string inputSrc = rootDir / ("input/" + fileName);
 	hdrTexture.initialise("hdrTexture", inputSrc);
 
-	// Create Env Cubemap
-	Cubemap envCubemap = Cubemap();
-	envCubemap.initialize(envCubeSize, "envCubemap");
+	// Create HDRI Cubemap
+	Cubemap hdriCubemap = Cubemap();
+	hdriCubemap.initialize(envCubeSize, "hdriCubemap");
 
 	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
 	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
@@ -148,6 +143,31 @@ int main()
 	for (unsigned int i = 0; i < 6; ++i)
 	{
 		glUniformMatrix4fv(equirectangularToCubemapViewLoc, 1, GL_FALSE, glm::value_ptr(captureViews[i]));
+		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, hdriCubemap.getId(), 0);
+		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+
+		cube.draw();
+	}
+	glBindFramebuffer(GL_FRAMEBUFFER, 0);
+
+	// Create Env Cubemap
+	Cubemap envCubemap = Cubemap();
+	envCubemap.initialize(envCubeSize, "envCubemap");
+
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	glBindRenderbuffer(GL_RENDERBUFFER, captureRBO);
+	glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH_COMPONENT24, envCubeSize, envCubeSize);
+	glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, captureRBO);
+
+	envProgram.use();
+	glUniformMatrix4fv(envProjectionLoc, 1, GL_FALSE, glm::value_ptr(captureProjection));
+	hdriCubemap.use(envProgramId, 0);
+
+	glViewport(0, 0, envCubeSize, envCubeSize);
+	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
+	for (unsigned int i = 0; i < 6; ++i)
+	{
+		glUniformMatrix4fv(envViewLoc, 1, GL_FALSE, glm::value_ptr(captureViews[i]));
 		glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + i, envCubemap.getId(), 0);
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
@@ -167,7 +187,7 @@ int main()
 
 	irradianceProgram.use();
 	glUniformMatrix4fv(irradianceProjectionLoc, 1, GL_FALSE, glm::value_ptr(captureProjection));
-	envCubemap.use(irradianceProgramId, 0);
+	hdriCubemap.use(irradianceProgramId, 0);
 
 	glViewport(0, 0, irradianceSize, irradianceSize);
 	glBindFramebuffer(GL_FRAMEBUFFER, captureFBO);
