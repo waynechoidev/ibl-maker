@@ -46,6 +46,7 @@ _deps
 
 # Build Folder
 out/build/
+output/
 
 # everything called a build folder
 [Bb][Uu][Ii][Ll][Dd]/
